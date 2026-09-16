@@ -1,0 +1,43 @@
+# Example style config schema for neural_pass.
+# One YAML file = one style. Post-train / fine-tune a base model into a
+# customized style model before (or while) using it in the generation pass.
+
+style:
+  id: example_style
+  name: Example Drawing Style
+  # Human-readable style description / prompt guidance for the generative model.
+  description: >
+    Soft ink-line drawing look with flat watercolor washes.
+    Prefer clean silhouettes, restrained hatching, muted palette.
+  # Optional short prompt fragment used at generation time (stubbed).
+  prompt: "stylized drawing, ink outline, soft watercolor wash"
+
+model:
+  # Placeholder base model identifier (checkpoint name, HF id, etc.).
+  base_model_id: "REPLACE_WITH_BASE_MODEL_ID"
+  # Where the fine-tuned style checkpoint will live after train_style.
+  style_model_path: "models/styles/example_style"
+  # Conditioning channels expected from Arnold AOVs + mask (documented intent).
+  conditioning:
+    aovs:
+      - position
+      - normal
+      - depth
+      - motion_vector
+    require_mask: true
+
+# Training / fine-tuning hyperparameters — placeholders only; trainer is stubbed.
+train:
+  learning_rate: 1.0e-5
+  batch_size: 1
+  max_steps: 1000
+  resolution: 1024
+  # Accepted flywheel pairs under data/accepted/ keyed by this style id.
+  data_root: "data/accepted"
+  seed: 42
+
+# Runtime generation defaults (stubs ignore most of these today).
+generate:
+  seed: 0
+  steps: 20
+  guidance_scale: 7.5

@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "neural_pass"
+version = "0.1.0"
+description = "Neural post-render pass after Arnold — stylized drawing via conditioned generative models (scaffold)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Joey Skeys" }]
+dependencies = [
+  "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+dev = []
+
+[project.scripts]
+neural-pass = "neural_pass.pipeline:main_stub"
+neural-pass-train = "neural_pass.stages.train_style:main_stub"
+
+[tool.setuptools.packages.find]
+where = ["src"]
