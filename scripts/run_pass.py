@@ -2,9 +2,9 @@
 """CLI entry: run the neural pass pipeline (stubs) and print stage flow.
 
 Example:
-  python scripts/run_pass.py \\
-    --style configs/styles/example_style.yaml \\
-    --aov-dir data/aovs \\
+  python scripts/run_pass.py \
+    --style configs/styles/example_style.yaml \
+    --aov-dir data/aovs \
     --mask data/masks/example_mask.png
 """
 
@@ -63,7 +63,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     print("=== neural_pass run_pass (stub dry-run) ===")
-    print("Stage sequence: aov_ingest \u2192 conditioning \u2192 generate \u2192 edit_loop \u2192 [flywheel]")
+    print("Stage sequence: aov_ingest → conditioning → generate → edit_loop → [flywheel]")
     result = run_pass(
         style_config_path=args.style,
         aov_dir=args.aov_dir,
