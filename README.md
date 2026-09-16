@@ -58,6 +58,7 @@ Orchestrator: `pipeline.run_pass()` calls stages 1→5 in order. Training is int
 neural_pass/
   README.md
   pyproject.toml
+  docs/aov_requirements.md
   configs/styles/example_style.yaml
   data/{aovs,masks,generations,edits,accepted}/
   src/neural_pass/
@@ -65,7 +66,8 @@ neural_pass/
     stages/…
     models/base.py          # StyleModel protocol
     io/{style_config,paths}.py
-  scripts/{run_pass,train_style}.py
+    gui/                    # mask editor (PySide6)
+  scripts/{run_pass,train_style,mask_editor,make_sample_aovs}.py
 ```
 
 ## What's stubbed
@@ -95,6 +97,65 @@ Training entry (stub):
 ```bash
 python scripts/train_style.py --style configs/styles/example_style.yaml
 ```
+
+
+## Mask editor (GUI)
+
+Basic PySide6 tool to inspect Arnold (or sample) AOVs and paint a float mask overlay.
+
+See also: [`docs/aov_requirements.md`](docs/aov_requirements.md) for expected logical names (`position`, `normal`, `depth`, `motion_vector`).
+
+### Install
+
+```bash
+python -m pip install -e ".[gui]"
+# or without editable install:
+python -m pip install PySide6 numpy imageio
+```
+
+OpenEXR is optional. If `pip install OpenEXR` fails on Windows, skip it — the loader still accepts `.tif` / `.tiff` / `.png` / `.npy` (and EXR when imageio FreeImage / OpenEXR is available).
+
+### Sample AOVs (no Arnold)
+
+```bash
+python scripts/make_sample_aovs.py
+```
+
+Writes tiny buffers under `data/aovs/_sample/`.
+
+### Run
+
+```bash
+# from repo root
+set PYTHONPATH=src
+python scripts/mask_editor.py --aov-dir data/aovs/_sample
+```
+
+Optional: `--mask path/to/mask.png`. Console script (after install): `neural-pass-mask-editor`.
+
+Import check (no display required):
+
+```bash
+set PYTHONPATH=src
+python -c "from neural_pass.gui.app import run; print('ok')"
+```
+
+### Shortcuts
+
+| Key | Action |
+|-----|--------|
+| `Tab` | Next AOV buffer |
+| `Shift+Tab` | Previous AOV buffer |
+| `C` | Next channel within current AOV |
+| `[` / `]` | Decrease / increase brush size |
+| `B` | Brush mode |
+| `E` | Eraser mode |
+| `Ctrl+O` | Open AOV folder |
+| `Ctrl+S` | Save mask (8-bit grayscale PNG) |
+| LMB | Paint in current mode |
+| RMB | Erase |
+
+Mask values are float HxW in `[0, 1]` (start zeros). Display normalization does not alter underlying AOV arrays. Missing AOVs still allow loading what exists; a warning appears in the status bar.
 
 ## Style configs
 
