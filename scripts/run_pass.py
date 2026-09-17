@@ -2,9 +2,9 @@
 """CLI entry: run the neural pass pipeline (stubs) and print stage flow.
 
 Example:
-  python scripts/run_pass.py \
-    --style configs/styles/example_style.yaml \
-    --aov-dir data/aovs \
+  python scripts/run_pass.py \\
+    --style configs/styles/example_style.yaml \\
+    --aov-dir data/aovs \\
     --mask data/masks/example_mask.png
 """
 
