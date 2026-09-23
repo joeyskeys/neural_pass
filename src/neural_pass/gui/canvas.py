@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Optional, Tuple
+import math
+from typing import Iterator, Optional, Tuple
 
 import numpy as np
 from PySide6.QtCore import Qt, Signal
@@ -10,6 +11,37 @@ from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import QLabel, QSizePolicy, QWidget, QVBoxLayout
 
 from neural_pass.gui.aov_loader import normalize_for_display, overlay_mask_rgb
+
+# Disk diameter is 2× radius, so steps of half a radius stay solidly overlapped
+# without restamping on every pixel of a slow drag.
+_STROKE_SPACING_SCALE = 0.5
+
+
+def _stroke_spacing(radius: int) -> float:
+    return max(1.0, float(radius) * _STROKE_SPACING_SCALE)
+
+
+def _iter_stroke_points(
+    x0: float,
+    y0: float,
+    x1: float,
+    y1: float,
+    spacing: float,
+) -> Iterator[Tuple[int, int]]:
+    """Dab centers along the segment, excluding the already-stamped start.
+
+    A zero-length segment yields nothing. ``spacing`` is in pixels.
+    """
+    dx = float(x1) - float(x0)
+    dy = float(y1) - float(y0)
+    dist = math.hypot(dx, dy)
+    if dist <= 1e-6:
+        return
+    step = spacing if spacing > 0 else 1.0
+    n = max(1, int(math.ceil(dist / step)))
+    for i in range(1, n + 1):
+        t = i / n
+        yield int(round(x0 + dx * t)), int(round(y0 + dy * t))
 
 
 def _numpy_rgb_to_qimage(rgb: np.ndarray) -> QImage:
@@ -49,6 +81,7 @@ class MaskCanvas(QWidget):
         self._mode = "brush"  # or "eraser"
         self._painting = False
         self._paint_value = 1.0
+        self._last_paint_ij: Optional[Tuple[int, int]] = None
         self._scale = 1.0
 
         self._label.setMouseTracking(True)
@@ -172,31 +205,62 @@ class MaskCanvas(QWidget):
             return False
         self._painting = True
         self._paint_value = val
-        self._stamp(event.position().toPoint())
+        self._last_paint_ij = None
+        ij = self._widget_to_image(event.position().toPoint())
+        if ij is not None:
+            self._dab(*ij)
+            self._last_paint_ij = ij
+            self._refresh()
         return True
 
     def _on_move(self, event) -> bool:
         if not self._painting or self._mask is None:
             return False
-        self._stamp(event.position().toPoint())
+        ij = self._widget_to_image(event.position().toPoint())
+        if ij is None:
+            # Cursor left the image. Drop the anchor so the next sample
+            # starts a new dab instead of drawing a chord across the canvas.
+            self._last_paint_ij = None
+            return True
+        if self._stroke_to(ij):
+            self._refresh()
         return True
 
     def _on_release(self, event) -> bool:
         if self._painting:
             self._painting = False
+            self._last_paint_ij = None
             self.mask_changed.emit()
             return True
         return False
 
-    def _stamp(self, pos) -> None:
-        ij = self._widget_to_image(pos)
-        if ij is None:
+    def _stroke_to(self, ij: Tuple[int, int]) -> bool:
+        """Stamp every dab from the previous sample to ``ij``. Returns True if painted."""
+        painted = False
+        prev = self._last_paint_ij
+        if prev is None:
+            self._dab(*ij)
+            painted = True
+        else:
+            spacing = _stroke_spacing(self._brush_radius)
+            for px, py in _iter_stroke_points(prev[0], prev[1], ij[0], ij[1], spacing):
+                if (px, py) == prev:
+                    continue
+                self._dab(px, py)
+                prev = (px, py)
+                painted = True
+        self._last_paint_ij = ij
+        return painted
+
+    def _dab(self, ix: int, iy: int) -> None:
+        if self._mask is None:
             return
-        ix, iy = ij
         r = self._brush_radius
         h, w = self._mask.shape
         y0, y1 = max(0, iy - r), min(h, iy + r + 1)
         x0, x1 = max(0, ix - r), min(w, ix + r + 1)
+        if y0 >= y1 or x0 >= x1:
+            return
         yy, xx = np.ogrid[y0:y1, x0:x1]
         dist2 = (yy - iy) ** 2 + (xx - ix) ** 2
         disk = dist2 <= r * r
@@ -204,7 +268,6 @@ class MaskCanvas(QWidget):
             self._mask[y0:y1, x0:x1][disk] = 1.0
         else:
             self._mask[y0:y1, x0:x1][disk] = 0.0
-        self._refresh()
 
     def _refresh(self) -> None:
         if self._base_rgb is None or self._mask is None:
