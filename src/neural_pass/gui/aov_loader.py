@@ -126,6 +126,18 @@ def discover_aov_files(aov_dir: Path) -> Tuple[Dict[str, Path], List[str], List[
     return mapping, missing, warnings
 
 
+def _exr_channel_map(obj):
+    """Return the channel dict from an OpenEXR File or Part.
+
+    OpenEXR 3.x ``File.channels`` is a method (``channels()``). ``Part.channels``
+    and some older bindings expose a dict attribute. Call only when callable.
+    """
+    channels = getattr(obj, "channels", None)
+    if callable(channels):
+        channels = channels()
+    return channels
+
+
 def _load_openexr(path: Path) -> np.ndarray:
     """Load EXR via OpenEXR bindings (classic or OpenEXR 3.x File API)."""
     import OpenEXR  # type: ignore
@@ -133,12 +145,13 @@ def _load_openexr(path: Path) -> np.ndarray:
     # OpenEXR 3.x / modern bindings: File + channels as arrays
     if hasattr(OpenEXR, "File"):
         f = OpenEXR.File(str(path))
-        header = f.header() if callable(getattr(f, "header", None)) else getattr(f, "header", {})
-        channels = getattr(f, "channels", None)
-        if channels is None and hasattr(f, "parts"):
+        channels = _exr_channel_map(f)
+        if not channels and hasattr(f, "parts"):
             # Multi-part: take first part channels
             parts = f.parts
-            channels = parts[0].channels if parts else {}
+            if callable(parts):
+                parts = parts()
+            channels = _exr_channel_map(parts[0]) if parts else {}
         if not channels:
             raise RuntimeError("OpenEXR.File opened but no channels found")
         names = list(channels.keys())
